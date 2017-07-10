@@ -1,0 +1,127 @@
+---
+title: "Practical Machine Learning Project"
+author: "Syed Karim"
+date: "July 4, 2017"
+output: html_document
+---
+
+#Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, my goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. The goal of the project is to predict the manner in which they did the exercise.
+
+#Data
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+#Prepareing The Environment
+First we need to load all the relevant packages to perform the analysis and creat the charts.
+```{r echo=T}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+#library(rattle)
+library(randomForest)
+library(knitr)
+```
+
+# Getting and Cleaning Data
+
+Test and Training data sets are loaded from the given url. 
+```{r echo=T}
+trainUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+training <- read.csv(trainUrl, na.strings = c("NA", ""))
+testing <- read.csv(testUrl, na.strings = c("NA", ""))
+```
+
+Partitioning the tarinning set into two is done by spliting the training set into two, one as smaller training set and one as validation set  
+```{r echo=T}
+inTrain <- createDataPartition(training$classe, p=0.6, list=FALSE)
+tTraining <- training[inTrain, ]
+tTesting <- training[-inTrain, ]
+dim(tTraining); dim(tTesting)
+```
+
+I have done some cleaning of the training data set by removing variables with nearly zero variance along with removing valiables that are always NA and valiables those are not relevant to the prediction. After careful analysis, i have choosen first seven variables as irrelevant to the prediction.  
+
+```{r echo=T}
+nzv <- nearZeroVar(tTraining)
+tTraining <- tTraining[, -nzv]
+tTesting  <- tTesting [, -nzv]
+
+NAVal <- sapply(tTraining, function(x) mean(is.na(x))) > 0.90 #http://www.listendata.com/2016/01/r-apply-function-on-rows.html
+
+tTraining <- tTraining[, NAVal==F]
+tTesting <- tTesting[, NAVal==F]
+
+tTraining  <- tTraining[, -(1:7)]
+tTesting<- tTesting[, -(1:7)]
+
+```
+#Building Model:
+Below I have created two modeld using Random Forest and Decision tree along with prediction on the validation set and confusion matrix for both of them.  
+
+Random Forest:
+```{r echo=T}
+set.seed(12345)
+modFit1 <- randomForest(classe ~ ., data=tTraining)
+prediction1 <- predict(modFit1, tTesting, type = "class")
+cmtxrf <- confusionMatrix(prediction1, tTesting$classe)
+cmtxrf
+```
+
+Decision Tree:
+```{r echo=T}
+set.seed(12345)
+modFit2 <- rpart(classe ~ ., data=tTraining, method="class")
+#fancyRpartPlot(modFit2)
+
+predictions2 <- predict(modFit2, tTesting, type = "class")
+cmtxtree <- confusionMatrix(predictions2, tTesting$classe)
+cmtxtree
+```
+
+
+#Retrain the selected model
+Applying the model on the test set, now a prediction can be made. However, before doing that we need to train the model on full trainning set and repeat the process of removing irrelevant variables, near zero variance, and variables that are almost NA on training and test set. 
+
+```{r echo=T}
+nzv <- nearZeroVar(training)
+training <- training[, -nzv]
+testing <- testing[, -nzv]
+```
+```{r echo=T}
+NAvalues<- sapply(training, function(x) mean(is.na(x))) > 0.90
+#http://www.listendata.com/2016/01/r-apply-function-on-rows.html
+training <- training[, NAvalues==F]
+testing <- testing[, NAvalues==F]
+```
+```{r echo=T}
+training <- training[, -(1:7)]
+testing <- testing[, -(1:7)]
+```
+
+```{r echo=T}
+
+modFit <- randomForest(classe ~ ., data=training)
+
+```
+#Pridicting on Test Data
+##With 99.17% accuracy, random Forest provieds accuracy more than that of Decision Tree. 
+##The expected out-of-sample error is .13%.
+Hence, I have choosen build the final prediction model using Random Forest. 
+```{r echo=T}
+finalPrediction <- predict(modFit, testing, type = "class")
+
+finalPrediction
+```
+
+
+
+
